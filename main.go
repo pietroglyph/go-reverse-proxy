@@ -81,7 +81,7 @@ func main() {
 				url.Path += "/" + splitpath[key]
 			}
 			req.URL = url
-			fmt.Println(req.URL)
+			log.Println(req.URL)
 		} else {
 			return
 		}
