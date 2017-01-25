@@ -1,14 +1,14 @@
 package main
 
 import (
-	"encoding/json"
+	"bufio"
 	"flag"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
+	"os"
 	"strings"
 )
 
@@ -19,10 +19,11 @@ type Proxy struct {
 
 func main() {
 	var proxy Proxy
-	var jsonArbitraryTemplate interface{}
+	// Initalize our routeTable map
+	proxy.routeTable = make(map[string]string)
 	// Defualts for command line flags
 	const (
-		defaultPort      = "80"
+		defaultPort      = "8080"
 		defaultPortUsage = "default server port, '80', '8080'..."
 		defaultHost      = "localhost"
 		defaultHostUsage = "default server host, 'localhost', '127.0.0.1', ' 0:0:0:0:0:0:0:1'"
@@ -31,36 +32,58 @@ func main() {
 	)
 	// Define command line flags
 	port := flag.String("port", defaultPort, defaultPortUsage)
-	host := flag.String("url", defaultHost, defaultHostUsage)
+	host := flag.String("host", defaultHost, defaultHostUsage)
 	tls := flag.Bool("tls", defualtTls, defualtTlsUsage)
 	// Parse command line flags
 	flag.Parse()
 	// Print info
-	fmt.Printf("reverse-proxy will run on %s:%s\n", *host, *port)
-	// Read routeTable
-	rawTable, err := ioutil.ReadFile("routeTable.json")
+	log.Println(fmt.Sprintf("reverse-proxy will run on %s:%s", *host, *port))
+	/*
+		##Read routeTable##
+		Each whole route is separated by a newline, and each subroute with source and destination is separated by a space.
+		This is simpler than having to map some formatting standard like JSON onto a map.
+	*/
+	file, err := os.Open("routetable.txt")
 	if err != nil {
 		log.Fatal(err)
 	}
-	fmt.Println(string(rawTable))
-	// Unmarshall routeTable JSON
-	err = json.Unmarshal(rawTable, jsonArbitraryTemplate)
-	// Extract top-level map from our json interface for arbitrary data using a type assertion to a map[string]string
-	proxy.routeTable = jsonArbitraryTemplate.(map[string]string)
-	if err != nil {
+	defer file.Close()
+
+	// Create a scanner to read the file line-by-line
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		split := strings.Split(scanner.Text(), " ")
+		if len(split) == 2 {
+			proxy.routeTable[split[0]] = split[1]
+		} else {
+			log.Println("coulndn't parse", split, "of routetable.txt, discarding line")
+		}
+	}
+
+	if err := scanner.Err(); err != nil {
 		log.Fatal(err)
 	}
-	// Make a director to route requests based on the JSON table
+	// Make sure we know that reading routetable is done
+	log.Println("succsessfully read routetable.txt with", len(proxy.routeTable), "entries")
+	// Make a director to route requests based on routetable
 	director := func(req *http.Request) {
 
-		path := strings.TrimPrefix(req.URL.Path, "/") // Trim the leading / from the path of the url (eg. https://example.com/example->example)
+		path := strings.TrimPrefix(req.URL.Path, "/") // Trim the leading / from the path of the url (eg. /example->example)
 
 		if proxy.routeTable[path] != "" {
 			url, err := url.Parse(proxy.routeTable[path])
 			if err != nil {
 				log.Fatal(err)
 			}
+			strings.TrimSuffix(url.Path, "/")     // Trim trailing backslashes so we don't get double slashes in our path from appending the path from our original request
+			splitpath := strings.Split(path, "/") // Split path using the string "/" as a deliniator
+			for key := range splitpath[:1] {      // Range over all but the first index of splitpath so we can pass it on to our *http.Request.URL
+				url.Path += "/" + splitpath[key]
+			}
 			req.URL = url
+			fmt.Println(req.URL)
+		} else {
+			return
 		}
 
 		if _, ok := req.Header["User-Agent"]; !ok {
@@ -76,13 +99,13 @@ func main() {
 	// Make a ReverseProxy and give it a Director
 	proxy.reverseProxy = &httputil.ReverseProxy{Director: director}
 	// Put our host and port settings into a string
-	bind := fmt.Sprintf("%s:%s", host, port)
+	bind := fmt.Sprintf("%s:%s", *host, *port)
 	// Serve the reverse proxy
 	if *tls {
-		log.Printf("Serving with TLS on  %s.", bind)
+		log.Printf("Serving with TLS on  %s", bind)
 		log.Fatal(http.ListenAndServeTLS(bind, "cert.pem", "key.pem", proxy.reverseProxy))
 	} else {
-		log.Printf("Serving without TLS on %s.", bind)
+		log.Printf("Serving without TLS on %s", bind)
 		log.Fatal(http.ListenAndServe(bind, proxy.reverseProxy))
 	}
 }
