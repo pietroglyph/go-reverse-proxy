@@ -69,22 +69,28 @@ func main() {
 	director := func(req *http.Request) {
 
 		path := strings.TrimPrefix(req.URL.Path, "/") // Trim the leading / from the path of the url (eg. /example->example)
-
-		if proxy.routeTable[path] != "" {
-			url, err := url.Parse(proxy.routeTable[path])
+		splitpath := strings.Split(path, "/")         // Split path using the string "/" as a deliniator
+		routekey := splitpath[0]
+		if proxy.routeTable[routekey] != "" {
+			url, err := url.Parse(proxy.routeTable[routekey])
 			if err != nil {
 				log.Fatal(err)
 			}
-			strings.TrimSuffix(url.Path, "/")     // Trim trailing backslashes so we don't get double slashes in our path from appending the path from our original request
-			splitpath := strings.Split(path, "/") // Split path using the string "/" as a deliniator
-			for key := range splitpath[:1] {      // Range over all but the first index of splitpath so we can pass it on to our *http.Request.URL
-				url.Path += "/" + splitpath[key]
+			strings.TrimSuffix(url.Path, "/") // Trim trailing backslashes so we don't get double slashes in our path from appending the path from our original request
+			for key := range splitpath {      // Range over all but the first index of splitpath so we can pass it on to our *http.Request.URL
+				if key > 0 {
+					url.Path += "/" + splitpath[key]
+				}
 			}
+
 			req.URL = url
-			log.Println(req.URL)
 		} else {
-			return
+			log.Println("there is no routing entry for ", path)
+			req.URL, _ = url.Parse("https://en.wikipedia.org/wiki/List_of_HTTP_status_codes#4xx_Client_Error")
 		}
+
+		req.Header.Set("Host", req.URL.Host) // Make sure that we aren't giving the target the wrong host header
+		req.Host = req.URL.Host              // **If this isn't set the host header gets ignored**
 
 		if _, ok := req.Header["User-Agent"]; !ok {
 
