@@ -23,17 +23,26 @@ func main() {
 	proxy.routeTable = make(map[string]string)
 	// Defualts for command line flags
 	const (
-		defaultPort      = "8080"
-		defaultPortUsage = "default server port, '80', '8080'..."
-		defaultHost      = "localhost"
-		defaultHostUsage = "default server host, 'localhost', '127.0.0.1', ' 0:0:0:0:0:0:0:1'"
-		defualtTls       = false
-		defualtTlsUsage  = "defualt tls status, 'true', 'false'"
+		defaultPort                 = "8080"
+		defaultPortUsage            = "default server port, '80'; '8080'..."
+		defaultHost                 = "localhost"
+		defaultHostUsage            = "default server host, 'localhost', '127.0.0.1'; ' 0:0:0:0:0:0:0:1'"
+		defualtTls                  = false
+		defualtTlsUsage             = "defualt tls status, 'true', 'false'"
+		defualtRouteTablePath       = "routetable.txt"
+		defualtRouteTablePathUsage  = "defualt routetable path, 'routetable.txt'; '/home/declan/work/src/github.com/pietroglyph/go-reverse-proxy/routetable.txt'"
+		defualtPrivateKeyPath       = "key.pem"
+		defualtPrivateKeyPathUsage  = "defualt private key path, 'key.pem'; '/etc/letsencrypt/live/example.com/privkey.pem'"
+		defualtCertificatePath      = "cert.pem"
+		defualtCertificatePathUsage = "default path to the *full* certificate chain, 'cert.pem'; '/etc/letsencrypt/live/example.com/fullchain.pem'"
 	)
 	// Define command line flags
 	port := flag.String("port", defaultPort, defaultPortUsage)
 	host := flag.String("host", defaultHost, defaultHostUsage)
 	tls := flag.Bool("tls", defualtTls, defualtTlsUsage)
+	routetable := flag.String("routetable", defualtRouteTablePath, defualtRouteTablePathUsage)
+	key := flag.String("key", defualtPrivateKeyPath, defualtPrivateKeyPathUsage)
+	cert := flag.String("cert", defualtCertificatePath, defualtCertificatePathUsage)
 	// Parse command line flags
 	flag.Parse()
 	// Print info
@@ -43,7 +52,7 @@ func main() {
 		Each whole route is separated by a newline, and each subroute with source and destination is separated by a space.
 		This is simpler than having to map some formatting standard like JSON onto a map.
 	*/
-	file, err := os.Open("routetable.txt")
+	file, err := os.Open(*routetable)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -113,7 +122,7 @@ func main() {
 	// Serve the reverse proxy
 	if *tls {
 		log.Printf("Serving with TLS on  %s", bind)
-		log.Fatal(http.ListenAndServeTLS(bind, "cert.pem", "key.pem", proxy.reverseProxy))
+		log.Fatal(http.ListenAndServeTLS(bind, *key, *cert, proxy.reverseProxy))
 	} else {
 		log.Printf("Serving without TLS on %s", bind)
 		log.Fatal(http.ListenAndServe(bind, proxy.reverseProxy))
