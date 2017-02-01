@@ -69,7 +69,8 @@ func main() {
 	director := func(req *http.Request) {
 
 		path := strings.TrimPrefix(req.URL.Path, "/") // Trim the leading / from the path of the url (eg. /example->example)
-		splitpath := strings.Split(path, "/")         // Split path using the string "/" as a deliniator
+		log.Println(req.URL.Path)
+		splitpath := strings.Split(path, "/") // Split path using the string "/" as a deliniator
 		routekey := splitpath[0]
 		if proxy.routeTable[routekey] != "" {
 			url, err := url.Parse(proxy.routeTable[routekey])
@@ -82,6 +83,9 @@ func main() {
 					url.Path += "/" + splitpath[key]
 				}
 			}
+
+			// Append any query data
+			url.RawQuery = req.URL.RawQuery // ? is inserted for us
 
 			req.URL = url
 		} else {
