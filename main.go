@@ -12,27 +12,27 @@ import (
 	"strings"
 )
 
-type Proxy struct {
-	reverseProxy *httputil.ReverseProxy
+type proxy struct {
+	reverseproxy *httputil.ReverseProxy
 	routeTable   map[string]string
 }
 
 func main() {
-	var proxy Proxy
-	// Initalize our routeTable map
-	proxy.routeTable = make(map[string]string)
-	// Defualts for command line flags
+	var prox proxy
+	// Initialize our routeTable map
+	prox.routeTable = make(map[string]string)
+	// Defaults for command line flags
 	const (
 		defaultPort                 = "8080"
 		defaultPortUsage            = "default server port, '80'; '8080'..."
 		defaultHost                 = "localhost"
 		defaultHostUsage            = "default server host, 'localhost', '127.0.0.1'; ' 0:0:0:0:0:0:0:1'"
 		defualtTls                  = false
-		defualtTlsUsage             = "defualt tls status, 'true', 'false'"
+		defualtTlsUsage             = "default tls status, 'true', 'false'"
 		defualtRouteTablePath       = "routetable.txt"
-		defualtRouteTablePathUsage  = "defualt routetable path, 'routetable.txt'; '/home/declan/work/src/github.com/pietroglyph/go-reverse-proxy/routetable.txt'"
+		defualtRouteTablePathUsage  = "default routetable path, 'routetable.txt'; '/home/declan/work/src/github.com/pietroglyph/go-reverse-prox/routetable.txt'"
 		defualtPrivateKeyPath       = "key.pem"
-		defualtPrivateKeyPathUsage  = "defualt private key path, 'key.pem'; '/etc/letsencrypt/live/example.com/privkey.pem'"
+		defualtPrivateKeyPathUsage  = "default private key path, 'key.pem'; '/etc/letsencrypt/live/example.com/privkey.pem'"
 		defualtCertificatePath      = "cert.pem"
 		defualtCertificatePathUsage = "default path to the *full* certificate chain, 'cert.pem'; '/etc/letsencrypt/live/example.com/fullchain.pem'"
 	)
@@ -46,7 +46,7 @@ func main() {
 	// Parse command line flags
 	flag.Parse()
 	// Print info
-	log.Println(fmt.Sprintf("reverse-proxy will run on %s:%s", *host, *port))
+	log.Println(fmt.Sprintf("reverse-prox will run on %s:%s", *host, *port))
 	/*
 		##Read routeTable##
 		Each whole route is separated by a newline, and each subroute with source and destination is separated by a space.
@@ -63,7 +63,7 @@ func main() {
 	for scanner.Scan() {
 		split := strings.Split(scanner.Text(), " ")
 		if len(split) == 2 {
-			proxy.routeTable[split[0]] = split[1]
+			prox.routeTable[split[0]] = split[1]
 		} else {
 			log.Println("coulndn't parse", split, "of routetable.txt, discarding line")
 		}
@@ -73,7 +73,7 @@ func main() {
 		log.Fatal(err)
 	}
 	// Make sure we know that reading routetable is done
-	log.Println("succsessfully read routetable.txt with", len(proxy.routeTable), "entries")
+	log.Println("succsessfully read routetable.txt with", len(prox.routeTable), "entries")
 	// Make a director to route requests based on routetable
 	director := func(req *http.Request) {
 
@@ -81,8 +81,8 @@ func main() {
 		log.Println(req.URL.Path)
 		splitpath := strings.Split(path, "/") // Split path using the string "/" as a deliniator
 		routekey := splitpath[0]
-		if proxy.routeTable[routekey] != "" {
-			url, err := url.Parse(proxy.routeTable[routekey])
+		if prox.routeTable[routekey] != "" {
+			url, err := url.Parse(prox.routeTable[routekey])
 			if err != nil {
 				log.Fatal(err)
 			}
@@ -115,16 +115,16 @@ func main() {
 
 	}
 
-	// Make a ReverseProxy and give it a Director
-	proxy.reverseProxy = &httputil.ReverseProxy{Director: director}
+	// Make a Reverseproxy and give it a Director
+	prox.reverseproxy = &httputil.ReverseProxy{Director: director}
 	// Put our host and port settings into a string
 	bind := fmt.Sprintf("%s:%s", *host, *port)
-	// Serve the reverse proxy
+	// Serve the reverse prox
 	if *tls {
 		log.Printf("Serving with TLS on  %s", bind)
-		log.Fatal(http.ListenAndServeTLS(bind, *key, *cert, proxy.reverseProxy))
+		log.Fatal(http.ListenAndServeTLS(bind, *key, *cert, prox.reverseproxy))
 	} else {
 		log.Printf("Serving without TLS on %s", bind)
-		log.Fatal(http.ListenAndServe(bind, proxy.reverseProxy))
+		log.Fatal(http.ListenAndServe(bind, prox.reverseproxy))
 	}
 }
